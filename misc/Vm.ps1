@@ -38,6 +38,11 @@ function shutdown_specific_vm {
 
     $vm = Read-Host "Enter the VM name"
     Write-Host "Shutting down $vm" -ForegroundColor Green
+    $vm = Get-VM -Name $vm
+    if ($vm.PowerState -eq "PoweredOff") {
+        Write-Host "VM is already Powerd Off" -ForegroundColor Red
+        exit
+    }
     Stop-VM -VM $vm -Confirm:$true
 
 }
@@ -120,6 +125,11 @@ function restart_specific_vm {
 
     $vm = Read-Host "Enter the VM name"
     Write-Host "Restarting $vm" -ForegroundColor Green
+    $vm = Get-VM -Name $vm
+    if ($vm.PowerState -eq "PoweredOff") {
+        Write-Host "VM is already running" -ForegroundColor Red
+        exit
+    }
     Restart-VM -VM $vm -Confirm:$true
 
 }
@@ -202,6 +212,14 @@ function start_specific_vm {
 
     $vm = Read-Host "Enter the VM name"
     Write-Host "Starting $vm" -ForegroundColor Green
+    
+    #check if the VM is already running
+    $vm = Get-VM -Name $vm
+    if ($vm.PowerState -eq "PoweredOn") {
+        Write-Host "VM is already running" -ForegroundColor Red
+        exit
+    }
+
     Start-VM -VM $vm -Confirm:$true
 
 }
