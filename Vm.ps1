@@ -1,184 +1,7 @@
 Import-Module VMware.VimAutomation.Core
 Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false | Out-Null
+. .\Auth.ps1
 
-function ConvertTo-AESKey128 {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]$String
-    )
-
-    # Convert the string to bytes using UTF8 encoding
-    $Bytes = [System.Text.Encoding]::UTF8.GetBytes($String)
-
-    # Compute the SHA-256 hash of the bytes
-    $SHA256 = [System.Security.Cryptography.SHA256]::Create()
-    $Hash = $SHA256.ComputeHash($Bytes)
-
-    # Take the first 16 bytes (128 bits) of the hash as the key
-    $Key = $Hash[0..15]
-
-    return $Key
-}
-function Encrypt-Strings {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string[]]$StringsToEncrypt,
-        [Parameter(Mandatory=$true)]
-        [byte[]]$Aes128Key
-    )
-
-
-    $encryptedStrings = @()
-
-    foreach ($string in $StringsToEncrypt) {
-        $plaintextBytes = [System.Text.Encoding]::UTF8.GetBytes($string)
-
-
-        $aes = New-Object System.Security.Cryptography.AesCryptoServiceProvider
-        $aes.KeySize = 128
-        $aes.BlockSize = 128
-        $aes.Key = $Aes128Key
-        $aes.IV = (New-Object Byte[] 16)
-        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
-
-
-        $encryptor = $aes.CreateEncryptor()
-
-        $encryptedBytes = $encryptor.TransformFinalBlock($plaintextBytes, 0, $plaintextBytes.Length)
-        $encryptedString = [System.Convert]::ToBase64String($encryptedBytes)
-        $encryptedStrings += $encryptedString
-    }
-
-    return $encryptedStrings
-}
-
-function Encrypt-StringsToJsonFile {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string[]]$StringsToEncrypt,
-        [Parameter(Mandatory=$true)]
-        [byte[]]$AesKey,
-        [Parameter(Mandatory=$true)]
-        [string]$OutputFilePath
-    )
-
-    $encryptedStrings = Encrypt-Strings -StringsToEncrypt $StringsToEncrypt -Aes128Key $AesKey
-
-    $jsonContent = @{
-        EncryptedStrings = $encryptedStrings
-    } | ConvertTo-Json
-
-    Set-Content -Path $OutputFilePath -Value $jsonContent
-}
-
-function Decrypt-StringsFromJson {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$JsonFilePath,
-        [Parameter(Mandatory=$true)]
-        [byte[]]$AesKey
-    )
-
-    # Print the key
- 
-    $json = Get-Content $JsonFilePath | ConvertFrom-Json
-
-    $encryptedStrings = $json.EncryptedStrings
-
-    
-
-    $decryptedStrings = @()
-
-    foreach ($encryptedString in $EncryptedStrings) {
-        $encryptedBytes = [System.Convert]::FromBase64String($encryptedString)
-
-        $aes = New-Object System.Security.Cryptography.AesCryptoServiceProvider
-        $aes.KeySize = 128
-        $aes.BlockSize = 128
-        $aes.Key = $AesKey
-        $aes.IV = (New-Object Byte[] 16)
-        $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
-
-
-        $decryptor = $aes.CreateDecryptor()
-
-        $decryptedBytes = $decryptor.TransformFinalBlock($encryptedBytes, 0, $encryptedBytes.Length)
-        $decryptedString = [System.Text.Encoding]::UTF8.GetString($decryptedBytes)
-        $decryptedStrings += $decryptedString
-    }
-
-    return $decryptedStrings
-}
-
-function get_credentials {
-    [CmdletBinding()]
-    Param()
-
-    Write-Host "`nSelect Login mode"
-    Write-Host "    1. Login with manual credentials"
-    Write-Host "    2. Login stored credentials"
-
-    $mode = Read-Host "Option"
-
-    switch ($mode) {
-        "1" { 
-            $Credentials = "", "",""
-            $Credentials[0] = Read-Host "Enter the server IP "
-            $Credentials[1] = Read-Host "Enter the User "
-            $tmp = Read-Host "Enter the Password: " -AsSecureString
-            $Credentials[2] = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($tmp))
-            
-            Write-Host "Do you wanna save the credentials? (y/n)"
-            $save = Read-Host "Option"
-            if ($save -eq "y") {
-                Write-Host "Enter the name of the credential"
-                $name = Read-Host "Name"
-                Write-Host "Enter the Password for encrypting"
-                $pass = Read-Host "Hash"
-
-                $hash = ConvertTo-AESKey128 -String $pass
-                
-                Encrypt-StringsToJsonFile -StringsToEncrypt $Credentials -AesKey $hash -OutputFilePath "$name.json"
-
-            }
-            
-            return $Credentials
-
-
-         }
-        "2" { 
-            #list all the json files in the current directory
-            $jsonFiles = Get-ChildItem -Path . -Filter *.json -Recurse -File
-
-            foreach ($file in $jsonFiles) {
-                Write-Host "`t -" $file.Name.Substring(0, $file.Name.Length - 5) -ForegroundColor Green
-            }
-
-            Write-Host "Enter the credential name"
-            $name = Read-Host "Name"
-            Write-Host "Enter the Password for decrypting the data"
-            $pass = Read-Host "Hash" -AsSecureString
-
-            $pass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pass))
-
-            $hash = ConvertTo-AESKey128 -String $pass
-
-
-            #decrypt the strings
-            $decryptedStrings = Decrypt-StringsFromJson  -JsonFilePath "$name.json" -AesKey $hash
-
-       
-            return $decryptedStrings
-          
-         }
-        Default {
-            Write-Host "`nInvalid option" -ForegroundColor Red
-            exit}
-    }
-  
-}
 
 function Select_from_menu {
     [CmdletBinding()]
@@ -470,7 +293,11 @@ function Process_option {
 
 }
 
+
+Clear-Host
+#start a job to get the credentials using get_credentials
 $data = get_credentials
+
 
 try {
     $ErrorActionPreference = "Stop";
