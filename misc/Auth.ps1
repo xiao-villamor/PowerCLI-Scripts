@@ -158,9 +158,9 @@ function get_credentials {
     [CmdletBinding()]
     Param()
 
-    Write-Host "`nSelect Login mode"
-    Write-Host "    1. Login with manual credentials"
-    Write-Host "    2. Login stored credentials"
+    Write-Host "`nSelect Login mode" 
+    Write-Host "    1. Login with manual credentials"  -ForegroundColor Green
+    Write-Host "    2. Login stored credentials" -ForegroundColor Green
 
     $mode = Read-Host "Option"
 
@@ -203,7 +203,7 @@ function get_credentials {
          }
         "2" { 
             Clear-Host
-            Write-Host "Saved credentials : "
+            Write-Host "Saved credentials : `n"
             #list the atribute name from all the credentials in the xml file
             $xml = New-Object System.Xml.XmlDocument
             $xml.Load("credentials.xml")
@@ -213,7 +213,7 @@ function get_credentials {
             $credentials2 = $root.GetElementsByTagName("Credential")
 
             foreach ($credential in $credentials2) {
-                Write-Host $credential.Attributes.GetNamedItem("name").Value
+                Write-Host "`t-" $credential.Attributes.GetNamedItem("name").Value -ForegroundColor Green
             }
             
             

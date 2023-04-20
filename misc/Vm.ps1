@@ -1,9 +1,10 @@
 Import-Module VMware.VimAutomation.Core
 Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false | Out-Null
-. .\Auth.ps1
 
+. .\misc\MainMenu.ps1
 
-function Select_from_menu {
+$data = "","",""
+function Select_from_menu_vm {
     [CmdletBinding()]
     Param()
 
@@ -89,8 +90,9 @@ function shutdown_vm {
             shutdown_group_vms
         }
         "4" {
-            Write-Host "`nExiting"
-            exit
+            Clear-Host -Confirm:$false
+            $mode = Select_from_menu_vm
+            Process_option_vm -mode $mode
         }
         Default {
             Write-Host "`nInvalid option" -ForegroundColor Red
@@ -170,8 +172,9 @@ function restart_vm {
             restart_group_vms
         }
         "4" {
-            Write-Host "`nExiting"
-            exit
+            Clear-Host -Confirm:$false
+            $mode = Select_from_menu_vm
+            Process_option_vm -mode $mode
         }
         Default {
             Write-Host "`nInvalid option" -ForegroundColor Red
@@ -254,14 +257,30 @@ function start_vm {
             start_group_vms
         }
         "4" {
-            Write-Host "`nExiting"
-            exit
+            Clear-Host -Confirm:$false
+            $mode = Select_from_menu_vm
+            Process_option_vm -mode $mode
         }
         
     }
 }
 
-function Process_option {
+function proces_do_something_else{
+    [CmdletBinding()]
+    Param()
+    Write-Host "Wanna do something else? (y/n)"
+            $choice = Read-Host
+            if ($choice -eq "y") {
+                Clear-Host -Confirm:$false
+                $mode = Select_from_menu_vm
+                Process_option_vm -mode $mode
+            }else{
+                Write-Host "`nExiting"
+                exit
+            }
+}
+
+function Process_option_vm {
     [CmdletBinding()]
     Param(
         [Parameter(Mandatory=$true)]
@@ -274,16 +293,18 @@ function Process_option {
     switch ($mode) {
         "1" {
             shutdown_vm
+            proces_do_something_else
         }
         "2" {
             restart_vm
+            proces_do_something_else
         }
         "3" {
             start_vm
+            proces_do_something_else
         }
         "4" {
-            Write-Host "`nExiting"
-            exit
+            start_main_menu -Credentials $data
         }
         Default {
             Write-Host "`nInvalid option" -ForegroundColor Red
@@ -293,21 +314,31 @@ function Process_option {
 
 }
 
+function start_vm_script {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$true)]
+        [string[]]$Credentials
+    )
+    $data = $Credentials
+    Clear-Host
+    try {
+        $ErrorActionPreference = "Stop";
+        Connect-VIServer -Server $data[0] -User $data[1] -Password $data[2]
+    
+    }catch{
+        Write-Host "`nAn exception occurred`n" -ForegroundColor Red
+        Exit
+    } 
+    Clear-Host -Confirm:$false
+    $mode = Select_from_menu_vm
+    Process_option_vm -mode $mode
+    Clear-Host -Confirm:$false
 
-Clear-Host
+}
+
+
+
 #start a job to get the credentials using get_credentials
-$data = get_credentials
 
 
-try {
-    $ErrorActionPreference = "Stop";
-    Connect-VIServer -Server $data[0] -User $data[1] -Password $data[2]
-
-}catch{
-    Write-Host "`nAn exception occurred`n" -ForegroundColor Red
-    Exit
-} 
-Clear-Host -Confirm:$false
-$mode = Select_from_menu
-Process_option -mode $mode
-Clear-Host -Confirm:$false

@@ -1,7 +1,9 @@
 Import-Module VMware.VimAutomation.Core
 Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false | Out-Null
-. .\Auth.ps1
 
+. .\misc\MainMenu.ps1
+
+$data = "","",""
 function shutdown_from_cluster {    
     [CmdletBinding()]
     Param()
@@ -94,9 +96,7 @@ function Process_option {
             Shutdown_from_CSV
         }
         "3" {
-            Write-Host "`nExiting"
-            Clear-Host -Confirm:$false
-            exit
+            start_main_menu -Credentials $data
         }
         Default {
             Write-Host "`nInvalid option" -ForegroundColor Red
@@ -108,25 +108,32 @@ function Process_option {
 }
 
 
-$data = get_credentials
+function start_host_script{
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$true)]
+        [string[]]$Credentials
+    )
+    $data = $Credentials
+    try {
+        $ErrorActionPreference = "Stop";
+        Connect-VIServer -Server $data[0] -User $data[1] -Password $data[2]
+    
+    }catch{
+        Write-Host "`nAn exception occurred`n" -ForegroundColor Red
+        Disconnect-VIServer -Confirm:$false
+        Exit
+    } 
+    
+    Clear-Host -Confirm:$false
+    
+    
+    $mode = Select_from_menu
+    Process_option -mode $mode
+    Clear-Host -Confirm:$false
+}
 
 
-try {
-    $ErrorActionPreference = "Stop";
-    Connect-VIServer -Server $data[0] -User $data[1] -Password $data[2]
-
-}catch{
-    Write-Host "`nAn exception occurred`n" -ForegroundColor Red
-    Disconnect-VIServer -Confirm:$false
-    Exit
-} 
-
-Clear-Host -Confirm:$false
-
-
-$mode = Select_from_menu
-Process_option -mode $mode
-Clear-Host -Confirm:$false
 
 
 
